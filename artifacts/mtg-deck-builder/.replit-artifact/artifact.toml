@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "MTG Deck Builder"
+version = "1.0.0"
+id = "artifacts/mtg-deck-builder"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 24510
+
+[services.development]
+run = "pnpm --filter @workspace/mtg-deck-builder run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/mtg-deck-builder", "run", "build" ]
+publicDir = "artifacts/mtg-deck-builder/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "24510"
+BASE_PATH = "/"

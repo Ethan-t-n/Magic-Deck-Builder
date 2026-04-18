@@ -14,3 +14,153 @@ import * as zod from "zod";
 export const HealthCheckResponse = zod.object({
   status: zod.string(),
 });
+
+/**
+ * @summary List all conversations
+ */
+export const ListOpenaiConversationsResponseItem = zod.object({
+  id: zod.number(),
+  title: zod.string(),
+  createdAt: zod.coerce.date(),
+});
+export const ListOpenaiConversationsResponse = zod.array(
+  ListOpenaiConversationsResponseItem,
+);
+
+/**
+ * @summary Create a new conversation
+ */
+export const CreateOpenaiConversationBody = zod.object({
+  title: zod.string(),
+});
+
+/**
+ * @summary Get conversation with messages
+ */
+export const GetOpenaiConversationParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetOpenaiConversationResponse = zod.object({
+  id: zod.number(),
+  title: zod.string(),
+  createdAt: zod.coerce.date(),
+  messages: zod.array(
+    zod.object({
+      id: zod.number(),
+      conversationId: zod.number(),
+      role: zod.string(),
+      content: zod.string(),
+      createdAt: zod.coerce.date(),
+    }),
+  ),
+});
+
+/**
+ * @summary Delete a conversation
+ */
+export const DeleteOpenaiConversationParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
+ * @summary List messages in a conversation
+ */
+export const ListOpenaiMessagesParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ListOpenaiMessagesResponseItem = zod.object({
+  id: zod.number(),
+  conversationId: zod.number(),
+  role: zod.string(),
+  content: zod.string(),
+  createdAt: zod.coerce.date(),
+});
+export const ListOpenaiMessagesResponse = zod.array(
+  ListOpenaiMessagesResponseItem,
+);
+
+/**
+ * @summary Send a text message and receive a streaming text response
+ */
+export const SendOpenaiMessageParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const SendOpenaiMessageBody = zod.object({
+  content: zod.string(),
+});
+
+/**
+ * @summary List all saved decks
+ */
+export const ListDecksResponseItem = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  format: zod.string(),
+  colors: zod.string(),
+  strategy: zod.string(),
+  conversationId: zod.number().nullable(),
+  createdAt: zod.coerce.date(),
+});
+export const ListDecksResponse = zod.array(ListDecksResponseItem);
+
+/**
+ * @summary Save a generated deck
+ */
+export const SaveDeckBody = zod.object({
+  name: zod.string(),
+  format: zod.string(),
+  colors: zod.string(),
+  strategy: zod.string(),
+  conversationId: zod.number().nullish(),
+  cards: zod.array(
+    zod.object({
+      cardName: zod.string(),
+      quantity: zod.number(),
+      section: zod.string(),
+      scryfallId: zod.string().nullish(),
+      imageUri: zod.string().nullish(),
+      manaCost: zod.string().nullish(),
+      typeLine: zod.string().nullish(),
+    }),
+  ),
+});
+
+/**
+ * @summary Get a deck with its cards
+ */
+export const GetDeckParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetDeckResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  format: zod.string(),
+  colors: zod.string(),
+  strategy: zod.string(),
+  conversationId: zod.number().nullable(),
+  createdAt: zod.coerce.date(),
+  cards: zod.array(
+    zod.object({
+      id: zod.number(),
+      deckId: zod.number(),
+      cardName: zod.string(),
+      quantity: zod.number(),
+      section: zod.string(),
+      scryfallId: zod.string().nullable(),
+      imageUri: zod.string().nullable(),
+      manaCost: zod.string().nullable(),
+      typeLine: zod.string().nullable(),
+    }),
+  ),
+});
+
+/**
+ * @summary Delete a deck
+ */
+export const DeleteDeckParams = zod.object({
+  id: zod.coerce.number(),
+});

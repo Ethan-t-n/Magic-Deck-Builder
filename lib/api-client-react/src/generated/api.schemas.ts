@@ -8,3 +8,99 @@
 export interface HealthStatus {
   status: string;
 }
+
+export interface OpenaiConversation {
+  id: number;
+  title: string;
+  createdAt: string;
+}
+
+export interface OpenaiMessage {
+  id: number;
+  conversationId: number;
+  role: string;
+  content: string;
+  createdAt: string;
+}
+
+export interface CreateOpenaiConversationBody {
+  title: string;
+}
+
+export interface SendOpenaiMessageBody {
+  content: string;
+}
+
+export interface OpenaiConversationWithMessages {
+  id: number;
+  title: string;
+  createdAt: string;
+  messages: OpenaiMessage[];
+}
+
+export interface OpenaiError {
+  error: string;
+}
+
+export interface Deck {
+  id: number;
+  name: string;
+  format: string;
+  colors: string;
+  strategy: string;
+  /** @nullable */
+  conversationId: number | null;
+  createdAt: string;
+}
+
+export interface DeckCard {
+  id: number;
+  deckId: number;
+  cardName: string;
+  quantity: number;
+  section: string;
+  /** @nullable */
+  scryfallId: string | null;
+  /** @nullable */
+  imageUri: string | null;
+  /** @nullable */
+  manaCost: string | null;
+  /** @nullable */
+  typeLine: string | null;
+}
+
+export interface DeckWithCards {
+  id: number;
+  name: string;
+  format: string;
+  colors: string;
+  strategy: string;
+  /** @nullable */
+  conversationId: number | null;
+  createdAt: string;
+  cards: DeckCard[];
+}
+
+export type SaveDeckBodyCardsItem = {
+  cardName: string;
+  quantity: number;
+  section: string;
+  /** @nullable */
+  scryfallId?: string | null;
+  /** @nullable */
+  imageUri?: string | null;
+  /** @nullable */
+  manaCost?: string | null;
+  /** @nullable */
+  typeLine?: string | null;
+};
+
+export interface SaveDeckBody {
+  name: string;
+  format: string;
+  colors: string;
+  strategy: string;
+  /** @nullable */
+  conversationId?: number | null;
+  cards: SaveDeckBodyCardsItem[];
+}
