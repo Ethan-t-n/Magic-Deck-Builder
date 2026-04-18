@@ -1,4 +1,4 @@
-import { useGetDeck, useDeleteDeck, getGetDeckQueryKey } from "@workspace/api-client-react";
+import { useGetDeck, useDeleteDeck } from "@workspace/api-client-react";
 import { useParams, useLocation } from "wouter";
 import { Loader2, Trash2, ArrowLeft } from "lucide-react";
 import { DeckDisplay, ParsedDeck } from "@/components/deck-display";
@@ -16,30 +16,28 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { useQueryClient } from "@tanstack/react-query";
 
 export function DeckDetail() {
   const { id } = useParams();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const queryClient = useQueryClient();
-  
+
   const { data: deck, isLoading, error } = useGetDeck(Number(id));
   const deleteMutation = useDeleteDeck();
 
   if (isLoading) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <Loader2 className="w-12 h-12 animate-spin text-primary opacity-50" />
+        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
   if (error || !deck) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center gap-4">
-        <p className="text-destructive font-serif text-xl">The spell failed to resolve.</p>
-        <Link href="/decks" className="text-primary hover:underline">Return to Grimoire</Link>
+      <div className="flex-1 flex flex-col items-center justify-center gap-3">
+        <p className="text-sm text-muted-foreground">Deck not found.</p>
+        <Link href="/decks" className="text-sm text-primary hover:underline">Back to My Decks</Link>
       </div>
     );
   }
@@ -47,71 +45,63 @@ export function DeckDetail() {
   const handleDelete = async () => {
     try {
       await deleteMutation.mutateAsync({ id: Number(id) });
-      toast({
-        title: "Spell unraveled",
-        description: "The deck has been erased from the grimoire.",
-      });
+      toast({ title: "Deck deleted", description: "The deck has been removed." });
       setLocation("/decks");
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Erase failed",
-        description: "The arcane bindings could not be broken.",
-      });
+    } catch {
+      toast({ variant: "destructive", title: "Delete failed", description: "Please try again." });
     }
   };
 
-  // Convert the API Deck model to our ParsedDeck model for the display component
   const parsedDeck: ParsedDeck = {
     name: deck.name,
     format: deck.format,
     colors: deck.colors,
     strategy: deck.strategy,
-    cards: deck.cards.map(c => ({
+    cards: deck.cards.map((c) => ({
       cardName: c.cardName,
       quantity: c.quantity,
       section: c.section,
       manaCost: c.manaCost || undefined,
-      typeLine: c.typeLine || undefined
-    }))
+      typeLine: c.typeLine || undefined,
+    })),
   };
 
   return (
-    <div className="container max-w-6xl mx-auto py-8 px-4 h-[calc(100dvh-4rem)] flex flex-col">
-      <div className="flex justify-between items-center mb-6">
-        <Link href="/decks" className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
-          <ArrowLeft className="w-4 h-4" />
-          <span className="font-serif">Back to Tome</span>
+    <div className="max-w-5xl mx-auto w-full py-6 px-4 h-[calc(100dvh-3.5rem)] flex flex-col gap-4">
+      <div className="flex justify-between items-center">
+        <Link href="/decks" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
+          <ArrowLeft className="w-3.5 h-3.5" />
+          My Decks
         </Link>
-        
+
         <AlertDialog>
           <AlertDialogTrigger asChild>
-            <Button variant="outline" className="border-destructive/30 text-destructive hover:bg-destructive hover:text-destructive-foreground">
-              <Trash2 className="w-4 h-4 mr-2" />
-              Erase
+            <Button variant="outline" size="sm" className="gap-2 border-destructive/30 text-destructive hover:bg-destructive/10">
+              <Trash2 className="w-3.5 h-3.5" />
+              Delete
             </Button>
           </AlertDialogTrigger>
           <AlertDialogContent className="bg-card border-border">
             <AlertDialogHeader>
-              <AlertDialogTitle className="font-serif text-xl text-foreground">Erase this deck?</AlertDialogTitle>
+              <AlertDialogTitle className="text-foreground">Delete this deck?</AlertDialogTitle>
               <AlertDialogDescription className="text-muted-foreground">
-                This action cannot be undone. The deck will be permanently removed from your grimoire.
+                This action cannot be undone. The deck will be permanently deleted.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel className="bg-transparent border-border text-foreground hover:bg-background">Cancel</AlertDialogCancel>
-              <AlertDialogAction 
+              <AlertDialogCancel className="bg-transparent border-border text-foreground hover:bg-secondary">Cancel</AlertDialogCancel>
+              <AlertDialogAction
                 onClick={handleDelete}
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               >
-                Erase
+                Delete
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
       </div>
 
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 min-h-0 flex flex-col">
         <DeckDisplay deck={parsedDeck} />
       </div>
     </div>

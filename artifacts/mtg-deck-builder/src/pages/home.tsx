@@ -1,8 +1,6 @@
 import { useState, useRef, useEffect } from "react";
-import { Send, Loader2, Save, Sparkles } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { Send, Loader2, BookmarkPlus, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { useCreateOpenaiConversation, useSaveDeck } from "@workspace/api-client-react";
 import { ChatMessage } from "@/components/chat-message";
@@ -13,6 +11,13 @@ interface Message {
   content: string;
 }
 
+const SUGGESTIONS = [
+  "Aggressive red goblin deck for Modern",
+  "Blue/White control deck for Standard",
+  "Green stompy ramp for Commander",
+  "Black discard deck for Pioneer",
+];
+
 export function Home() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -20,14 +25,14 @@ export function Home() {
   const [conversationId, setConversationId] = useState<number | null>(null);
   const [generatedDeck, setGeneratedDeck] = useState<ParsedDeck | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  
+
   const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const { toast } = useToast();
-  
+
   const createConversation = useCreateOpenaiConversation();
   const saveDeckMutation = useSaveDeck();
 
-  // Scroll to bottom when messages change
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollIntoView({ behavior: "smooth" });
@@ -39,23 +44,20 @@ export function Home() {
     if (match && match[1]) {
       try {
         return JSON.parse(match[1]) as ParsedDeck;
-      } catch (e) {
-        console.error("Failed to parse deck JSON", e);
+      } catch {
         return null;
       }
     }
     return null;
   };
 
-  const handleSend = async (e?: React.FormEvent) => {
-    e?.preventDefault();
-    if (!input.trim() || isStreaming) return;
-
-    const userMsg = input.trim();
+  const handleSend = async (text?: string) => {
+    const userMsg = (text ?? input).trim();
+    if (!userMsg || isStreaming) return;
     setInput("");
-    
+
     setMessages((prev) => [...prev, { role: "user", content: userMsg }]);
-    setGeneratedDeck(null); // Clear previous deck when user sends a new message
+    setGeneratedDeck(null);
 
     try {
       setIsStreaming(true);
@@ -63,7 +65,7 @@ export function Home() {
 
       if (!currentConvId) {
         const conv = await createConversation.mutateAsync({
-          data: { title: userMsg.substring(0, 50) }
+          data: { title: userMsg.substring(0, 50) },
         });
         currentConvId = conv.id;
         setConversationId(conv.id);
@@ -72,66 +74,69 @@ export function Home() {
       setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
 
       const response = await fetch(`/api/openai/conversations/${currentConvId}/messages`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: userMsg }),
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to send message");
-      }
+      if (!response.ok) throw new Error("Failed to send message");
 
       const reader = response.body!.getReader();
       const decoder = new TextDecoder();
-      let buffer = '';
-      let fullContent = '';
+      let buffer = "";
+      let fullContent = "";
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        
+
         buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
+        const lines = buffer.split("\n");
         buffer = lines.pop()!;
-        
+
         for (const line of lines) {
-          if (line.startsWith('data: ')) {
+          if (line.startsWith("data: ")) {
             try {
               const data = JSON.parse(line.slice(6));
               if (data.content) {
                 fullContent += data.content;
                 setMessages((prev) => {
-                  const newMsgs = [...prev];
-                  newMsgs[newMsgs.length - 1].content = fullContent;
-                  return newMsgs;
+                  const next = [...prev];
+                  next[next.length - 1] = { role: "assistant", content: fullContent };
+                  return next;
                 });
               }
               if (data.done) {
                 const deck = extractDeckJson(fullContent);
-                if (deck) {
-                  setGeneratedDeck(deck);
-                }
+                if (deck) setGeneratedDeck(deck);
               }
-            } catch (e) {
-              // Ignore parse errors for incomplete chunks
+            } catch {
+              // ignore partial chunks
             }
           }
         }
       }
-    } catch (error) {
+    } catch {
       toast({
         variant: "destructive",
-        title: "Arcane interference",
-        description: "Failed to communicate with the grimoire. Please try again.",
+        title: "Something went wrong",
+        description: "Failed to get a response. Please try again.",
       });
+      setMessages((prev) => prev.filter((_, i) => i !== prev.length - 1));
     } finally {
       setIsStreaming(false);
     }
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
   const handleSaveDeck = async () => {
     if (!generatedDeck) return;
-    
     try {
       setIsSaving(true);
       await saveDeckMutation.mutateAsync({
@@ -140,125 +145,135 @@ export function Home() {
           format: generatedDeck.format,
           colors: generatedDeck.colors,
           strategy: generatedDeck.strategy,
-          conversationId: conversationId,
-          cards: generatedDeck.cards.map(c => ({
+          conversationId,
+          cards: generatedDeck.cards.map((c) => ({
             cardName: c.cardName,
             quantity: c.quantity,
             section: c.section,
             manaCost: c.manaCost,
-            typeLine: c.typeLine
-          }))
-        }
+            typeLine: c.typeLine,
+          })),
+        },
       });
-      
-      toast({
-        title: "Deck preserved",
-        description: `${generatedDeck.name} has been inscribed in your tome.`,
-      });
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Failed to save",
-        description: "The spell faded before the deck could be saved.",
-      });
+      toast({ title: "Deck saved", description: `${generatedDeck.name} has been saved.` });
+    } catch {
+      toast({ variant: "destructive", title: "Failed to save", description: "Please try again." });
     } finally {
       setIsSaving(false);
     }
   };
 
   return (
-    <div className="flex-1 flex flex-col max-w-6xl w-full mx-auto p-4 gap-6 h-[calc(100dvh-4rem)]">
-      {/* Chat Section */}
-      <div className={`flex flex-col ${generatedDeck ? 'h-[40vh]' : 'flex-1'} transition-all duration-500 ease-in-out`}>
-        <div className="flex-1 bg-card/40 border border-border/50 rounded-2xl overflow-hidden flex flex-col backdrop-blur-sm relative shadow-xl">
-          <div className="absolute inset-0 bg-gradient-to-b from-background/10 to-background/40 pointer-events-none" />
-          
-          <ScrollArea className="flex-1 p-6 relative z-10">
+    <div className="flex-1 flex flex-col max-w-5xl w-full mx-auto px-4 py-4 gap-4 h-[calc(100dvh-3.5rem)]">
+      {/* Chat area */}
+      <div className={`flex flex-col transition-all duration-500 ${generatedDeck ? "h-[38vh] min-h-0" : "flex-1"}`}>
+        <div className="flex-1 flex flex-col rounded-xl border border-border bg-card overflow-hidden">
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto p-4">
             {messages.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-center opacity-70 mt-20">
-                <div className="w-20 h-20 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(var(--primary),0.2)]">
-                  <Sparkles className="w-10 h-10 text-primary" />
+              <div className="flex flex-col items-center justify-center h-full py-12 text-center">
+                <div className="w-12 h-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-5">
+                  <Wand2 className="w-6 h-6 text-primary" />
                 </div>
-                <h2 className="text-2xl font-serif text-primary mb-2 tracking-wide">Consult the Grimoire</h2>
-                <p className="max-w-md text-muted-foreground">
-                  Speak your desires into the void. What kind of deck shall we weave today?
+                <h2 className="text-lg font-semibold text-foreground mb-1">Build your MTG deck</h2>
+                <p className="text-sm text-muted-foreground max-w-sm mb-8">
+                  Describe the deck you want — format, strategy, colors — and the AI will recommend cards and build the full list.
                 </p>
-                <div className="mt-8 flex flex-wrap justify-center gap-2 max-w-lg">
-                  {["Aggressive Red Goblins", "Blue/Black Control", "Dinosaur Tribal", "Green Ramp"].map((suggestion) => (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-lg">
+                  {SUGGESTIONS.map((s) => (
                     <button
-                      key={suggestion}
-                      onClick={() => setInput(`${suggestion} deck for Standard`)}
-                      className="px-4 py-2 rounded-full border border-border/50 bg-background/50 hover:bg-primary/10 hover:border-primary/30 transition-colors text-sm text-muted-foreground hover:text-foreground cursor-pointer"
+                      key={s}
+                      data-testid={`suggestion-${s}`}
+                      onClick={() => handleSend(s)}
+                      className="px-4 py-2.5 text-sm text-left rounded-lg border border-border bg-background hover:bg-secondary/60 hover:border-border/80 transition-colors text-muted-foreground hover:text-foreground"
                     >
-                      {suggestion}
+                      {s}
                     </button>
                   ))}
                 </div>
               </div>
             ) : (
-              <div className="max-w-3xl mx-auto pb-4">
+              <div className="max-w-3xl mx-auto space-y-1 pb-2">
                 {messages.map((msg, i) => (
                   <ChatMessage key={i} role={msg.role} content={msg.content} />
                 ))}
                 {isStreaming && messages[messages.length - 1]?.role === "user" && (
-                  <div className="flex justify-start mb-6">
-                    <div className="flex max-w-[80%] gap-4">
-                      <div className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center border bg-primary/20 border-primary text-primary">
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                      </div>
-                      <div className="px-5 py-4 rounded-2xl bg-card border border-border/50 text-foreground rounded-tl-sm flex items-center">
-                        <span className="flex space-x-1">
-                          <span className="w-2 h-2 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: "0ms" }}></span>
-                          <span className="w-2 h-2 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: "150ms" }}></span>
-                          <span className="w-2 h-2 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: "300ms" }}></span>
-                        </span>
-                      </div>
+                  <div className="flex justify-start py-2">
+                    <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-secondary/40 border border-border/50">
+                      <span className="flex space-x-1">
+                        {[0, 150, 300].map((delay) => (
+                          <span
+                            key={delay}
+                            className="w-1.5 h-1.5 rounded-full bg-primary/70 animate-bounce"
+                            style={{ animationDelay: `${delay}ms` }}
+                          />
+                        ))}
+                      </span>
                     </div>
                   </div>
                 )}
                 <div ref={scrollRef} />
               </div>
             )}
-          </ScrollArea>
+          </div>
 
-          <div className="p-4 border-t border-border/50 bg-background/60 backdrop-blur-md relative z-10">
-            <form onSubmit={handleSend} className="max-w-3xl mx-auto relative flex items-center">
-              <Input
+          {/* Input area */}
+          <div className="p-3 border-t border-border bg-background/60">
+            <div className="max-w-3xl mx-auto flex items-end gap-2">
+              <textarea
+                ref={inputRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Command the arcane..."
+                onKeyDown={handleKeyDown}
+                placeholder="Describe the deck you want to build..."
                 disabled={isStreaming}
-                className="w-full bg-card/80 border-border/50 h-14 pl-6 pr-14 rounded-full shadow-inner focus-visible:ring-primary/50 text-lg placeholder:font-serif placeholder:italic"
+                rows={1}
+                data-testid="input-message"
+                className="flex-1 resize-none bg-secondary/40 border border-border rounded-lg px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 focus:border-primary/50 transition-colors disabled:opacity-50 min-h-[40px] max-h-[120px] overflow-y-auto"
+                style={{ height: "auto" }}
+                onInput={(e) => {
+                  const target = e.target as HTMLTextAreaElement;
+                  target.style.height = "auto";
+                  target.style.height = `${Math.min(target.scrollHeight, 120)}px`;
+                }}
               />
-              <Button 
-                type="submit" 
-                size="icon" 
+              <Button
+                type="button"
+                size="icon"
                 disabled={!input.trim() || isStreaming}
-                className="absolute right-2 h-10 w-10 rounded-full"
+                onClick={() => handleSend()}
+                data-testid="button-send"
+                className="h-10 w-10 rounded-lg shrink-0"
               >
-                {isStreaming ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
+                {isStreaming ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
               </Button>
-            </form>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Deck Display Section */}
+      {/* Deck Display */}
       {generatedDeck && (
-        <div className="flex-1 min-h-[50vh] flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-8 duration-700">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-serif text-muted-foreground flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-primary" />
-              Deck Materialized
-            </h2>
-            <Button 
-              onClick={handleSaveDeck} 
+        <div className="flex-1 min-h-0 flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h2 className="font-semibold text-foreground">{generatedDeck.name}</h2>
+              <p className="text-xs text-muted-foreground">{generatedDeck.format} · {generatedDeck.colors}</p>
+            </div>
+            <Button
+              onClick={handleSaveDeck}
               disabled={isSaving}
               variant="outline"
-              className="border-primary/50 hover:bg-primary/20 font-serif"
+              size="sm"
+              data-testid="button-save-deck"
+              className="gap-2"
             >
-              {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-              Inscribe in Tome
+              {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <BookmarkPlus className="w-3.5 h-3.5" />}
+              Save Deck
             </Button>
           </div>
           <DeckDisplay deck={generatedDeck} />
