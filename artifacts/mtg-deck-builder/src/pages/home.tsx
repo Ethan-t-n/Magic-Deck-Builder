@@ -1,22 +1,19 @@
 import { useState, useRef, useEffect } from "react";
-import { Send, Loader2, BookmarkPlus, Wand2 } from "lucide-react";
+import { Send, Loader2, BookmarkPlus, Wand2, MessageSquare, Sliders } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useCreateOpenaiConversation, useSaveDeck } from "@workspace/api-client-react";
 import { ChatMessage } from "@/components/chat-message";
 import { DeckDisplay, ParsedDeck } from "@/components/deck-display";
+import { GuidedBuilder } from "@/components/guided-builder";
+import { cn } from "@/lib/utils";
 
 interface Message {
   role: "user" | "assistant";
   content: string;
 }
 
-const SUGGESTIONS = [
-  "Aggressive red goblin deck for Modern",
-  "Blue/White control deck for Standard",
-  "Green stompy ramp for Commander",
-  "Black discard deck for Pioneer",
-];
+type Mode = "chat" | "guided";
 
 export function Home() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -25,6 +22,7 @@ export function Home() {
   const [conversationId, setConversationId] = useState<number | null>(null);
   const [generatedDeck, setGeneratedDeck] = useState<ParsedDeck | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [mode, setMode] = useState<Mode>("chat");
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -51,11 +49,13 @@ export function Home() {
     return null;
   };
 
-  const handleSend = async (text?: string) => {
-    const userMsg = (text ?? input).trim();
+  const sendMessage = async (text: string) => {
+    const userMsg = text.trim();
     if (!userMsg || isStreaming) return;
     setInput("");
 
+    // Switch to chat view when a message is sent
+    setMode("chat");
     setMessages((prev) => [...prev, { role: "user", content: userMsg }]);
     setGeneratedDeck(null);
 
@@ -122,7 +122,7 @@ export function Home() {
         title: "Something went wrong",
         description: "Failed to get a response. Please try again.",
       });
-      setMessages((prev) => prev.filter((_, i) => i !== prev.length - 1));
+      setMessages((prev) => prev.slice(0, -1));
     } finally {
       setIsStreaming(false);
     }
@@ -131,7 +131,7 @@ export function Home() {
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      handleSend();
+      sendMessage(input);
     }
   };
 
@@ -163,86 +163,133 @@ export function Home() {
     }
   };
 
+  const hasMessages = messages.length > 0;
+
   return (
     <div className="flex-1 flex flex-col max-w-5xl w-full mx-auto px-4 py-4 gap-4 h-[calc(100dvh-3.5rem)]">
-      {/* Chat area */}
-      <div className={`flex flex-col transition-all duration-500 ${generatedDeck ? "h-[38vh] min-h-0" : "flex-1"}`}>
-        <div className="flex-1 flex flex-col rounded-xl border border-border bg-card overflow-hidden">
-          {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4">
-            {messages.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full py-12 text-center">
-                <div className="w-12 h-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-5">
-                  <Wand2 className="w-6 h-6 text-primary" />
-                </div>
-                <h2 className="text-lg font-semibold text-foreground mb-1">Build your MTG deck</h2>
-                <p className="text-sm text-muted-foreground max-w-sm mb-8">
-                  Describe the deck you want — format, strategy, colors — and the AI will recommend cards and build the full list.
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-lg">
-                  {SUGGESTIONS.map((s) => (
-                    <button
-                      key={s}
-                      data-testid={`suggestion-${s}`}
-                      onClick={() => handleSend(s)}
-                      className="px-4 py-2.5 text-sm text-left rounded-lg border border-border bg-background hover:bg-secondary/60 hover:border-border/80 transition-colors text-muted-foreground hover:text-foreground"
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
+      {/* Chat/Builder area */}
+      <div className={cn(
+        "flex flex-col transition-all duration-500",
+        generatedDeck ? "h-[42vh] min-h-0" : "flex-1"
+      )}>
+        <div className="flex-1 flex flex-col rounded-xl border border-border bg-card overflow-hidden min-h-0">
+
+          {/* Mode toggle — only show when no messages yet */}
+          {!hasMessages && (
+            <div className="flex items-center gap-1 p-3 border-b border-border/50 bg-background/40">
+              <button
+                onClick={() => setMode("chat")}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors",
+                  mode === "chat"
+                    ? "bg-secondary text-foreground font-medium"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <MessageSquare className="w-3.5 h-3.5" />
+                Chat
+              </button>
+              <button
+                onClick={() => setMode("guided")}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors",
+                  mode === "guided"
+                    ? "bg-secondary text-foreground font-medium"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <Sliders className="w-3.5 h-3.5" />
+                Guided Builder
+              </button>
+            </div>
+          )}
+
+          {/* Main content area */}
+          <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+            {mode === "guided" && !hasMessages ? (
+              /* Guided builder wizard */
+              <div className="flex-1 overflow-y-auto px-6 py-4">
+                <GuidedBuilder onBuild={sendMessage} disabled={isStreaming} />
               </div>
             ) : (
-              <div className="max-w-3xl mx-auto space-y-1 pb-2">
-                {messages.map((msg, i) => (
-                  <ChatMessage key={i} role={msg.role} content={msg.content} />
-                ))}
-                {isStreaming && messages[messages.length - 1]?.role === "user" && (
-                  <div className="flex justify-start py-2">
-                    <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-secondary/40 border border-border/50">
-                      <span className="flex space-x-1">
-                        {[0, 150, 300].map((delay) => (
-                          <span
-                            key={delay}
-                            className="w-1.5 h-1.5 rounded-full bg-primary/70 animate-bounce"
-                            style={{ animationDelay: `${delay}ms` }}
-                          />
-                        ))}
-                      </span>
+              /* Chat messages */
+              <div className="flex-1 overflow-y-auto p-4">
+                {!hasMessages ? (
+                  <div className="flex flex-col items-center justify-center h-full py-12 text-center">
+                    <div className="w-12 h-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-5">
+                      <Wand2 className="w-6 h-6 text-primary" />
+                    </div>
+                    <h2 className="text-lg font-semibold text-foreground mb-1">Build your MTG deck</h2>
+                    <p className="text-sm text-muted-foreground max-w-sm mb-8">
+                      Describe the deck you want — or switch to <strong className="text-foreground">Guided Builder</strong> for step-by-step options.
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-lg">
+                      {[
+                        "Aggressive red goblin deck for Modern",
+                        "Blue/White control deck for Standard",
+                        "Green stompy ramp for Commander",
+                        "Black discard deck for Pioneer",
+                      ].map((s) => (
+                        <button
+                          key={s}
+                          onClick={() => sendMessage(s)}
+                          className="px-4 py-2.5 text-sm text-left rounded-lg border border-border bg-background hover:bg-secondary/60 hover:border-border/80 transition-colors text-muted-foreground hover:text-foreground"
+                        >
+                          {s}
+                        </button>
+                      ))}
                     </div>
                   </div>
+                ) : (
+                  <div className="max-w-3xl mx-auto space-y-1 pb-2">
+                    {messages.map((msg, i) => (
+                      <ChatMessage key={i} role={msg.role} content={msg.content} />
+                    ))}
+                    {isStreaming && messages[messages.length - 1]?.role === "user" && (
+                      <div className="flex justify-start py-2">
+                        <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-secondary/40 border border-border/50">
+                          <span className="flex space-x-1">
+                            {[0, 150, 300].map((delay) => (
+                              <span
+                                key={delay}
+                                className="w-1.5 h-1.5 rounded-full bg-primary/70 animate-bounce"
+                                style={{ animationDelay: `${delay}ms` }}
+                              />
+                            ))}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                    <div ref={scrollRef} />
+                  </div>
                 )}
-                <div ref={scrollRef} />
               </div>
             )}
           </div>
 
-          {/* Input area */}
-          <div className="p-3 border-t border-border bg-background/60">
+          {/* Input — always visible */}
+          <div className="p-3 border-t border-border bg-background/60 shrink-0">
             <div className="max-w-3xl mx-auto flex items-end gap-2">
               <textarea
                 ref={inputRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Describe the deck you want to build..."
+                placeholder={mode === "guided" && !hasMessages ? "Or type your request directly..." : "Describe the deck you want to build..."}
                 disabled={isStreaming}
                 rows={1}
-                data-testid="input-message"
                 className="flex-1 resize-none bg-secondary/40 border border-border rounded-lg px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 focus:border-primary/50 transition-colors disabled:opacity-50 min-h-[40px] max-h-[120px] overflow-y-auto"
-                style={{ height: "auto" }}
                 onInput={(e) => {
-                  const target = e.target as HTMLTextAreaElement;
-                  target.style.height = "auto";
-                  target.style.height = `${Math.min(target.scrollHeight, 120)}px`;
+                  const t = e.target as HTMLTextAreaElement;
+                  t.style.height = "auto";
+                  t.style.height = `${Math.min(t.scrollHeight, 120)}px`;
                 }}
               />
               <Button
                 type="button"
                 size="icon"
                 disabled={!input.trim() || isStreaming}
-                onClick={() => handleSend()}
-                data-testid="button-send"
+                onClick={() => sendMessage(input)}
                 className="h-10 w-10 rounded-lg shrink-0"
               >
                 {isStreaming ? (
@@ -269,7 +316,6 @@ export function Home() {
               disabled={isSaving}
               variant="outline"
               size="sm"
-              data-testid="button-save-deck"
               className="gap-2"
             >
               {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <BookmarkPlus className="w-3.5 h-3.5" />}
