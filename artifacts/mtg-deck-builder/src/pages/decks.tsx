@@ -1,16 +1,50 @@
 import { useListDecks } from "@workspace/api-client-react";
 import { Link } from "wouter";
 import { format } from "date-fns";
-import { LayoutGrid, Loader2, Wand2 } from "lucide-react";
+import { LayoutGrid, Loader2, Wand2, LogIn } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@workspace/replit-auth-web";
 
 export function Decks() {
   const { data: decks, isLoading } = useListDecks();
+  const { isAuthenticated, isLoading: authLoading, login } = useAuth();
 
-  if (isLoading) {
+  if (isLoading || authLoading) {
     return (
       <div className="flex-1 flex items-center justify-center">
         <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="max-w-5xl mx-auto w-full py-8 px-4">
+        <div className="flex items-center gap-3 mb-8">
+          <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
+            <LayoutGrid className="w-4 h-4 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-xl font-semibold text-foreground">My Decks</h1>
+            <p className="text-xs text-muted-foreground">Your saved MTG decks</p>
+          </div>
+        </div>
+        <div className="flex flex-col items-center justify-center py-24 text-center rounded-xl border border-border bg-card">
+          <div className="w-12 h-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-4">
+            <LogIn className="w-6 h-6 text-primary" />
+          </div>
+          <h3 className="text-base font-medium text-foreground mb-1">Log in to see your decks</h3>
+          <p className="text-sm text-muted-foreground max-w-xs mb-6">
+            Create an account or log in to save and manage your MTG decks.
+          </p>
+          <button
+            onClick={login}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
+          >
+            <LogIn className="w-4 h-4" />
+            Log in
+          </button>
+        </div>
       </div>
     );
   }

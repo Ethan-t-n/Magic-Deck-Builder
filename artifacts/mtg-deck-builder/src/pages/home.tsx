@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect } from "react";
-import { Send, Loader2, BookmarkPlus, Wand2, MessageSquare, Sliders } from "lucide-react";
+import { Send, Loader2, BookmarkPlus, Wand2, MessageSquare, Sliders, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useCreateOpenaiConversation, useSaveDeck } from "@workspace/api-client-react";
 import { ChatMessage } from "@/components/chat-message";
 import { DeckDisplay, ParsedDeck } from "@/components/deck-display";
 import { GuidedBuilder } from "@/components/guided-builder";
+import { useAuth } from "@workspace/replit-auth-web";
 import { cn } from "@/lib/utils";
 
 interface Message {
@@ -27,6 +28,7 @@ export function Home() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const { toast } = useToast();
+  const { isAuthenticated, login } = useAuth();
 
   const createConversation = useCreateOpenaiConversation();
   const saveDeckMutation = useSaveDeck();
@@ -176,31 +178,33 @@ export function Home() {
 
           {/* Mode toggle — only show when no messages yet */}
           {!hasMessages && (
-            <div className="flex items-center gap-1 p-3 border-b border-border/50 bg-background/40">
-              <button
-                onClick={() => setMode("chat")}
-                className={cn(
-                  "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors",
-                  mode === "chat"
-                    ? "bg-secondary text-foreground font-medium"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                <MessageSquare className="w-3.5 h-3.5" />
-                Chat
-              </button>
-              <button
-                onClick={() => setMode("guided")}
-                className={cn(
-                  "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors",
-                  mode === "guided"
-                    ? "bg-secondary text-foreground font-medium"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                <Sliders className="w-3.5 h-3.5" />
-                Guided Builder
-              </button>
+            <div className="flex items-center gap-3 px-4 pt-3 pb-0">
+              <div className="flex items-center p-1 bg-secondary/40 rounded-lg border border-border/50 gap-0.5">
+                <button
+                  onClick={() => setMode("chat")}
+                  className={cn(
+                    "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm transition-all duration-200",
+                    mode === "chat"
+                      ? "bg-background shadow-sm text-foreground font-medium border border-border/60"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <MessageSquare className="w-3.5 h-3.5" />
+                  Chat
+                </button>
+                <button
+                  onClick={() => setMode("guided")}
+                  className={cn(
+                    "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm transition-all duration-200",
+                    mode === "guided"
+                      ? "bg-background shadow-sm text-foreground font-medium border border-border/60"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <Sliders className="w-3.5 h-3.5" />
+                  Guided Builder
+                </button>
+              </div>
             </div>
           )}
 
@@ -311,16 +315,28 @@ export function Home() {
               <h2 className="font-semibold text-foreground">{generatedDeck.name}</h2>
               <p className="text-xs text-muted-foreground">{generatedDeck.format} · {generatedDeck.colors}</p>
             </div>
-            <Button
-              onClick={handleSaveDeck}
-              disabled={isSaving}
-              variant="outline"
-              size="sm"
-              className="gap-2"
-            >
-              {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <BookmarkPlus className="w-3.5 h-3.5" />}
-              Save Deck
-            </Button>
+            {isAuthenticated ? (
+              <Button
+                onClick={handleSaveDeck}
+                disabled={isSaving}
+                variant="outline"
+                size="sm"
+                className="gap-2"
+              >
+                {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <BookmarkPlus className="w-3.5 h-3.5" />}
+                Save Deck
+              </Button>
+            ) : (
+              <Button
+                onClick={login}
+                variant="outline"
+                size="sm"
+                className="gap-2 border-primary/40 text-primary hover:bg-primary/10"
+              >
+                <LogIn className="w-3.5 h-3.5" />
+                Log in to save
+              </Button>
+            )}
           </div>
           <DeckDisplay deck={generatedDeck} />
         </div>
