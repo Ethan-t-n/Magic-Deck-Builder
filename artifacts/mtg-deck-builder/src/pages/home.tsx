@@ -215,11 +215,11 @@ export function Home() {
               </div>
             ) : (
               /* Chat messages */
-              <div className="flex-1 overflow-y-auto p-4">
+              <div className="flex-1 overflow-y-auto p-4 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/[0.05] via-transparent to-transparent">
                 {!hasMessages ? (
                   <div className="flex flex-col items-center justify-center h-full py-12 text-center">
-                    <div className="w-12 h-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-5">
-                      <Wand2 className="w-6 h-6 text-primary" />
+                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-violet-600 flex items-center justify-center mb-5 shadow-lg shadow-primary/30">
+                      <Wand2 className="w-7 h-7 text-white" />
                     </div>
                     <h2 className="text-lg font-semibold text-foreground mb-1">Build your MTG deck</h2>
                     <p className="text-sm text-muted-foreground max-w-sm mb-8">
@@ -235,7 +235,7 @@ export function Home() {
                         <button
                           key={s}
                           onClick={() => sendMessage(s)}
-                          className="px-4 py-2.5 text-sm text-left rounded-lg border border-border bg-background hover:bg-secondary/60 hover:border-border/80 transition-colors text-muted-foreground hover:text-foreground"
+                          className="px-4 py-2.5 text-sm text-left rounded-xl border border-border/60 bg-secondary/30 hover:bg-secondary/60 hover:border-primary/40 hover:shadow-sm hover:shadow-primary/10 transition-all text-muted-foreground hover:text-foreground"
                         >
                           {s}
                         </button>
@@ -243,18 +243,23 @@ export function Home() {
                     </div>
                   </div>
                 ) : (
-                  <div className="max-w-3xl mx-auto space-y-1 pb-2">
+                  <div className="max-w-3xl mx-auto space-y-0.5 pb-2">
                     {messages.map((msg, i) => (
-                      <ChatMessage key={i} role={msg.role} content={msg.content} />
+                      <ChatMessage
+                        key={i}
+                        role={msg.role}
+                        content={msg.content}
+                        onOptionSelect={msg.role === "assistant" ? sendMessage : undefined}
+                      />
                     ))}
                     {isStreaming && messages[messages.length - 1]?.role === "user" && (
-                      <div className="flex justify-start py-2">
-                        <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-secondary/40 border border-border/50">
+                      <div className="flex justify-start py-2 pl-9">
+                        <div className="flex items-center gap-1.5 px-4 py-3 rounded-2xl rounded-tl-sm bg-secondary/50 border border-border/60 shadow-sm">
                           <span className="flex space-x-1">
-                            {[0, 150, 300].map((delay) => (
+                            {[0, 160, 320].map((delay) => (
                               <span
                                 key={delay}
-                                className="w-1.5 h-1.5 rounded-full bg-primary/70 animate-bounce"
+                                className="w-2 h-2 rounded-full bg-primary/60 animate-bounce"
                                 style={{ animationDelay: `${delay}ms` }}
                               />
                             ))}
