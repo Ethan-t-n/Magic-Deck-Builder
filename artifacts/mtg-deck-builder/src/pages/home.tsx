@@ -182,10 +182,10 @@ export function Home() {
               <button
                 onClick={() => setMode("chat")}
                 className={cn(
-                  "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
+                  "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors text-primary-foreground",
                   mode === "chat"
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-primary/15 text-primary hover:bg-primary/25"
+                    ? "bg-primary"
+                    : "bg-primary/50 hover:bg-primary/70"
                 )}
               >
                 <MessageSquare className="w-3.5 h-3.5" />
@@ -194,10 +194,10 @@ export function Home() {
               <button
                 onClick={() => setMode("guided")}
                 className={cn(
-                  "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
+                  "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors text-primary-foreground",
                   mode === "guided"
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-primary/15 text-primary hover:bg-primary/25"
+                    ? "bg-primary"
+                    : "bg-primary/50 hover:bg-primary/70"
                 )}
               >
                 <Sliders className="w-3.5 h-3.5" />
