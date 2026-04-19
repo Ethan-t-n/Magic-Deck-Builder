@@ -19,13 +19,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </Link>
 
           {/* Nav */}
-          <nav className="flex items-center gap-1 text-sm flex-1">
+          <nav className="flex items-center gap-2 text-sm flex-1">
             <Link
               href="/"
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors font-medium ${
                 location === "/"
-                  ? "bg-secondary text-foreground font-medium"
-                  : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-primary/15 text-primary hover:bg-primary/25"
               }`}
             >
               <Zap className="h-3.5 w-3.5" />
@@ -33,10 +33,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </Link>
             <Link
               href="/decks"
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors font-medium ${
                 location.startsWith("/decks")
-                  ? "bg-secondary text-foreground font-medium"
-                  : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-primary/15 text-primary hover:bg-primary/25"
               }`}
             >
               <LayoutGrid className="h-3.5 w-3.5" />

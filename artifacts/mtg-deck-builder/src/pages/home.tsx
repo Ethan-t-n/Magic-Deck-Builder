@@ -178,33 +178,31 @@ export function Home() {
 
           {/* Mode toggle — only show when no messages yet */}
           {!hasMessages && (
-            <div className="flex items-center gap-3 px-4 pt-3 pb-0">
-              <div className="flex items-center p-1 bg-secondary/40 rounded-lg border border-border/50 gap-0.5">
-                <button
-                  onClick={() => setMode("chat")}
-                  className={cn(
-                    "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm transition-all duration-200",
-                    mode === "chat"
-                      ? "bg-background shadow-sm text-foreground font-medium border border-border/60"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <MessageSquare className="w-3.5 h-3.5" />
-                  Chat
-                </button>
-                <button
-                  onClick={() => setMode("guided")}
-                  className={cn(
-                    "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm transition-all duration-200",
-                    mode === "guided"
-                      ? "bg-background shadow-sm text-foreground font-medium border border-border/60"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <Sliders className="w-3.5 h-3.5" />
-                  Guided Builder
-                </button>
-              </div>
+            <div className="flex items-center gap-2 px-4 pt-3 pb-0">
+              <button
+                onClick={() => setMode("chat")}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
+                  mode === "chat"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-primary/15 text-primary hover:bg-primary/25"
+                )}
+              >
+                <MessageSquare className="w-3.5 h-3.5" />
+                Chat
+              </button>
+              <button
+                onClick={() => setMode("guided")}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
+                  mode === "guided"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-primary/15 text-primary hover:bg-primary/25"
+                )}
+              >
+                <Sliders className="w-3.5 h-3.5" />
+                Guided Builder
+              </button>
             </div>
           )}
 
