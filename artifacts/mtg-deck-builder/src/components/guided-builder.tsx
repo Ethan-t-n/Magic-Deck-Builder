@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowLeft, ChevronRight, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -179,13 +179,38 @@ export function GuidedBuilder({ onBuild, disabled }: GuidedBuilderProps) {
   const [selections, setSelections] = useState<Selections>({});
   const [history, setHistory] = useState<StepId[]>([]);
 
+  const [budget, setBudget] = useState("");
+  const [setQuery, setSetQuery] = useState("");
+  const [sets, setSets] = useState<{ code: string; name: string }[]>([]);
+  const [selectedSets, setSelectedSets] = useState<string[]>([]);
+  const [setStatus, setSetStatus] = useState<"idle" | "loading" | "ready" | "failed">("idle");
+
+  useEffect(() => {
+    if (currentStep !== "confirm") return;
+    const controller = new AbortController();
+    setSetStatus("loading");
+    fetch("https://api.scryfall.com/sets", { signal: controller.signal })
+      .then(response => {
+        if (!response.ok) throw new Error("Could not load sets");
+        return response.json();
+      })
+      .then(({ data }) => {
+        setSets(data);
+        setSetStatus("ready");
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setSetStatus("failed");
+      });
+    return () => controller.abort();
+  }, [currentStep]);
+
   const step = STEPS[currentStep];
 
   const handleOption = (value: string | null, next: StepId | null) => {
     const newSelections = { ...selections };
 
     if (currentStep === "numColors") {
-      // numColors just routes to sub-step
+      if (value === "Colorless") newSelections.colors = value;
     } else if (currentStep === "oneColor" || currentStep === "twoColors" || currentStep === "threeColors" || currentStep === "moreColors") {
       if (value) newSelections.colors = value;
     } else if (currentStep === "format") {
@@ -222,7 +247,14 @@ export function GuidedBuilder({ onBuild, disabled }: GuidedBuilderProps) {
     if (selections.theme) parts.push(`${selections.theme} tribal/themed`);
     parts.push("deck");
     if (selections.format) parts.push(`for ${selections.format}`);
-    onBuild(`Build me a ${parts.join(" ")}`);
+    const preferences = [];
+    if (budget) preferences.push(`Target budget: USD ${Number(budget)}. Say if the budget is unverified.`);
+    if (selectedSets.length) {
+      const preferred = sets.filter(set => selectedSets.includes(set.code))
+        .map(set => `${set.name} (${set.code})`).join(", ");
+      preferences.push(`Prefer cards with printings from these sets when legal: ${preferred}.`);
+    }
+    onBuild([`Build me a ${parts.join(" ")}.`, ...preferences].join(" "));
   };
 
   const selectionSummary = [
@@ -236,14 +268,38 @@ export function GuidedBuilder({ onBuild, disabled }: GuidedBuilderProps) {
 
   if (currentStep === "confirm") {
     return (
-      <div className="flex flex-col items-center justify-center h-full py-8 text-center">
+      <div className="flex flex-col items-center py-8 text-center">
         <div className="w-12 h-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-5">
           <Wand2 className="w-6 h-6 text-primary" />
         </div>
         <h3 className="font-semibold text-foreground text-lg mb-1">Ready to build!</h3>
         <p className="text-sm text-muted-foreground mb-1 max-w-xs">{selectionSummary}</p>
         <div className="flex flex-col gap-3 w-full max-w-xs mt-6">
-          <Button onClick={buildPrompt} disabled={disabled} className="w-full gap-2">
+          <label className="text-left text-sm">
+            Budget in USD (optional)
+            <input type="number" min="0" step="0.01" value={budget} onChange={event => setBudget(event.target.value)} className="mt-1 w-full rounded-md border border-border bg-background p-2" />
+          </label>
+          <label className="text-left text-sm">
+            Preferred Magic sets (optional)
+            <input type="search" value={setQuery} onChange={event => setSetQuery(event.target.value)} className="mt-1 w-full rounded-md border border-border bg-background p-2" placeholder="Search by set name or code" />
+          </label>
+          {setStatus === "loading" && <p className="text-xs text-muted-foreground">Loading sets…</p>}
+          {setStatus === "failed" && <p className="text-xs text-muted-foreground">Could not load the set catalog.</p>}
+          {setStatus === "ready" && setQuery.trim() && (
+            <div className="max-h-40 overflow-auto text-left">
+              {sets.filter(set => `${set.name} ${set.code}`.toLowerCase().includes(setQuery.trim().toLowerCase())).slice(0, 20).map(set => (
+                <label key={set.code} className="flex gap-2 py-1 text-sm">
+                  <input type="checkbox" checked={selectedSets.includes(set.code)} onChange={event => {
+                    const selected = event.target.checked;
+                    setSelectedSets(current => selected ? [...current, set.code] : current.filter(code => code !== set.code));
+                  }} />
+                  {set.name} ({set.code.toUpperCase()})
+                </label>
+              ))}
+            </div>
+          )}
+          {selectedSets.length > 0 && <p className="text-xs text-muted-foreground">{sets.filter(set => selectedSets.includes(set.code)).map(set => set.name).join(", ")}</p>}
+          <Button onClick={buildPrompt} disabled={disabled || (budget !== "" && (!Number.isFinite(Number(budget)) || Number(budget) < 0))} className="w-full gap-2">
             <Wand2 className="w-4 h-4" />
             Generate My Deck
           </Button>
@@ -254,6 +310,9 @@ export function GuidedBuilder({ onBuild, disabled }: GuidedBuilderProps) {
               setCurrentStep("numColors");
               setSelections({});
               setHistory([]);
+              setBudget("");
+              setSetQuery("");
+              setSelectedSets([]);
             }}
             className="w-full text-muted-foreground"
           >
