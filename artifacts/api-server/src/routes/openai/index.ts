@@ -1,4 +1,6 @@
 import { Router, type IRouter } from "express";
+import { ollamaChat } from "../../lib/ollamaChat";
+import { cardContext } from "../../lib/cardContext";
 import { eq, desc } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { conversations, messages } from "@workspace/db";
@@ -164,8 +166,10 @@ router.post("/conversations/:id/messages", async (req, res): Promise<void> => {
     .where(eq(messages.conversationId, conversationId))
     .orderBy(messages.createdAt);
 
+  const catalogContext = await cardContext(userContent);
   const chatMessages = [
     { role: "system" as const, content: MTG_SYSTEM_PROMPT },
+    ...(catalogContext ? [{ role: "system" as const, content: catalogContext }] : []),
     ...history.map((m) => ({
       role: m.role as "user" | "assistant",
       content: m.content,
@@ -174,16 +178,16 @@ router.post("/conversations/:id/messages", async (req, res): Promise<void> => {
 
   let stream;
   try {
-    stream = await openai.chat.completions.create({
-      model: process.env.OPENAI_MODEL ?? "gpt-5.2",
-      // Ollama's compatibility API supports max_tokens. Disable Qwen's thinking
-      // phase so small local models start producing visible answers sooner.
-      ...(isOllama
-        ? { max_tokens: 8192, reasoning_effort: "none" as const }
-        : { max_completion_tokens: 8192 }),
-      messages: chatMessages,
-      stream: true,
-    });
+    const model = process.env.OPENAI_MODEL ?? "gpt-5.2";
+    stream = isOllama
+      ? await ollamaChat(chatMessages, model,
+          process.env.AI_INTEGRATIONS_OPENAI_BASE_URL ?? process.env.OPENAI_BASE_URL!, catalogContext ? 512 : 8192)
+      : await openai.chat.completions.create({
+          model,
+          max_completion_tokens: 8192,
+          messages: chatMessages,
+          stream: true,
+        });
   } catch (error) {
     req.log.error({ err: error }, "AI request failed");
     res.status(502).json({ error: "Could not reach the AI model. Check that your configured model server is running and the model is installed." });
