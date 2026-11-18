@@ -81,7 +81,10 @@ export function Home() {
         body: JSON.stringify({ content: userMsg }),
       });
 
-      if (!response.ok) throw new Error("Failed to send message");
+      if (!response.ok) {
+        const failure = await response.json().catch(() => ({}));
+        throw new Error(failure.error ?? "Failed to send message");
+      }
 
       const reader = response.body!.getReader();
       const decoder = new TextDecoder();
@@ -108,6 +111,9 @@ export function Home() {
                   return next;
                 });
               }
+              if (data.error) {
+                toast({ variant: "destructive", title: "Chat interrupted", description: data.error });
+              }
               if (data.done) {
                 const deck = extractDeckJson(fullContent);
                 if (deck) setGeneratedDeck(deck);
@@ -118,11 +124,11 @@ export function Home() {
           }
         }
       }
-    } catch {
+    } catch (error) {
       toast({
         variant: "destructive",
-        title: "Something went wrong",
-        description: "Failed to get a response. Please try again.",
+        title: "Chat unavailable",
+        description: error instanceof Error ? error.message : "Failed to get a response. Please try again.",
       });
       setMessages((prev) => prev.slice(0, -1));
     } finally {

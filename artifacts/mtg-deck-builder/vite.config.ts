@@ -60,7 +60,11 @@ export default defineConfig({
   },
   server: {
     port,
-    host: "0.0.0.0",
+    host: process.env.LOCAL_DEV === "1" ? "127.0.0.1" : "0.0.0.0",
+    ...(process.env.LOCAL_DEV === "1" ? {
+      strictPort: true,
+      proxy: { "/api": { target: process.env.LOCAL_API_URL ?? "http://127.0.0.1:3001" } },
+    } : {}),
     allowedHosts: true,
     fs: {
       strict: true,

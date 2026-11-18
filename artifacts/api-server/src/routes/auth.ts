@@ -23,6 +23,14 @@ const OIDC_COOKIE_TTL = 10 * 60 * 1000;
 
 const router: IRouter = Router();
 
+router.use((req, res, next) => {
+  if (process.env.LOCAL_DEV === "1" && ["/login", "/logout"].includes(req.path)) {
+    res.redirect("/");
+    return;
+  }
+  next();
+});
+
 function getOrigin(req: Request): string {
   const proto = req.headers["x-forwarded-proto"] || "https";
   const host =
