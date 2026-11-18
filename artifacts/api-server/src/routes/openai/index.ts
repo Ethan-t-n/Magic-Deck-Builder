@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import { eq, desc } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { conversations, messages } from "@workspace/db";
-import { openai, aiConfigured } from "@workspace/integrations-openai-ai-server/client";
+import { openai, aiConfigured, isOllama } from "@workspace/integrations-openai-ai-server/client";
 import {
   CreateOpenaiConversationBody,
   SendOpenaiMessageBody,
@@ -176,7 +176,11 @@ router.post("/conversations/:id/messages", async (req, res): Promise<void> => {
   try {
     stream = await openai.chat.completions.create({
       model: process.env.OPENAI_MODEL ?? "gpt-5.2",
-      max_completion_tokens: 8192,
+      // Ollama's compatibility API supports max_tokens. Disable Qwen's thinking
+      // phase so small local models start producing visible answers sooner.
+      ...(isOllama
+        ? { max_tokens: 8192, reasoning_effort: "none" as const }
+        : { max_completion_tokens: 8192 }),
       messages: chatMessages,
       stream: true,
     });
@@ -189,6 +193,7 @@ router.post("/conversations/:id/messages", async (req, res): Promise<void> => {
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
+  res.flushHeaders();
   let fullResponse = "";
   try {
 
@@ -198,6 +203,12 @@ router.post("/conversations/:id/messages", async (req, res): Promise<void> => {
       fullResponse += content;
       res.write(`data: ${JSON.stringify({ content })}\n\n`);
     }
+  }
+
+  if (!fullResponse.trim()) {
+    res.write(`data: ${JSON.stringify({ error: "The model finished without an answer. Try a short question, and check the Ollama server output." })}\n\n`);
+    res.end();
+    return;
   }
 
   await db.insert(messages).values({
