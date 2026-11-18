@@ -7,6 +7,7 @@ import { ChatMessage } from "@/components/chat-message";
 import { DeckDisplay, ParsedDeck } from "@/components/deck-display";
 import { GuidedBuilder } from "@/components/guided-builder";
 import { useAuth } from "@workspace/replit-auth-web";
+import { readChatStream } from "@/lib/read-chat-stream";
 import { cn } from "@/lib/utils";
 
 interface Message {
@@ -86,51 +87,28 @@ export function Home() {
         throw new Error(failure.error ?? "Failed to send message");
       }
 
-      const reader = response.body!.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let fullContent = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop()!;
-
-        for (const line of lines) {
-          if (line.startsWith("data: ")) {
-            try {
-              const data = JSON.parse(line.slice(6));
-              if (data.content) {
-                fullContent += data.content;
-                setMessages((prev) => {
-                  const next = [...prev];
-                  next[next.length - 1] = { role: "assistant", content: fullContent };
-                  return next;
-                });
-              }
-              if (data.error) {
-                toast({ variant: "destructive", title: "Chat interrupted", description: data.error });
-              }
-              if (data.done) {
-                const deck = extractDeckJson(fullContent);
-                if (deck) setGeneratedDeck(deck);
-              }
-            } catch {
-              // ignore partial chunks
-            }
-          }
-        }
-      }
+      const fullContent = await readChatStream(response, content => {
+        setMessages(prev => {
+          const next = [...prev];
+          next[next.length - 1] = { role: "assistant", content };
+          return next;
+        });
+      });
+      const deck = extractDeckJson(fullContent);
+      if (deck) setGeneratedDeck(deck);
     } catch (error) {
       toast({
         variant: "destructive",
         title: "Chat unavailable",
         description: error instanceof Error ? error.message : "Failed to get a response. Please try again.",
       });
-      setMessages((prev) => prev.slice(0, -1));
+      setMessages(prev => {
+        const failure = { role: "assistant" as const, content: error instanceof Error ? error.message : "Chat failed. Please try again." };
+        const last = prev[prev.length - 1];
+        return last?.role === "assistant" && !last.content
+          ? [...prev.slice(0, -1), failure]
+          : [...prev, failure];
+      });
     } finally {
       setIsStreaming(false);
     }
@@ -258,7 +236,7 @@ export function Home() {
                         onOptionSelect={msg.role === "assistant" ? sendMessage : undefined}
                       />
                     ))}
-                    {isStreaming && messages[messages.length - 1]?.role === "user" && (
+                    {isStreaming && (messages[messages.length - 1]?.role === "user" || !messages[messages.length - 1]?.content) && (
                       <div className="flex justify-start py-2 pl-9">
                         <div className="flex items-center gap-1.5 px-4 py-3 rounded-2xl rounded-tl-sm bg-secondary/50 border border-border/60 shadow-sm">
                           <span className="flex space-x-1">
