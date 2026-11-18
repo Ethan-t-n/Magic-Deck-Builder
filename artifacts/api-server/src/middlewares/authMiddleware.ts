@@ -62,6 +62,12 @@ export async function authMiddleware(
     return this.user != null;
   } as Request["isAuthenticated"];
 
+  if (process.env.LOCAL_DEV === "1") {
+    req.user = { id: "local-user", email: null, firstName: "Local", lastName: "Player", profileImageUrl: null };
+    next();
+    return;
+  }
+
   const sid = getSessionId(req);
   if (!sid) {
     next();

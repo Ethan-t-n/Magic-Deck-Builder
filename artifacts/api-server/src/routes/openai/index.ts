@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import { eq, desc } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { conversations, messages } from "@workspace/db";
-import { openai } from "@workspace/integrations-openai-ai-server";
+import { openai, aiConfigured } from "@workspace/integrations-openai-ai-server/client";
 import {
   CreateOpenaiConversationBody,
   SendOpenaiMessageBody,
@@ -135,6 +135,11 @@ router.post("/conversations/:id/messages", async (req, res): Promise<void> => {
     return;
   }
 
+  if (!aiConfigured) {
+    res.status(503).json({ error: "Chat needs an AI model. For a free local model, configure Ollama in .env as shown in LOCAL_DEVELOPMENT.md, then restart pnpm dev." });
+    return;
+  }
+
   const conversationId = params.data.id;
   const userContent = body.data.content;
 
@@ -167,18 +172,25 @@ router.post("/conversations/:id/messages", async (req, res): Promise<void> => {
     })),
   ];
 
+  let stream;
+  try {
+    stream = await openai.chat.completions.create({
+      model: process.env.OPENAI_MODEL ?? "gpt-5.2",
+      max_completion_tokens: 8192,
+      messages: chatMessages,
+      stream: true,
+    });
+  } catch (error) {
+    req.log.error({ err: error }, "AI request failed");
+    res.status(502).json({ error: "Could not reach the AI model. Check that your configured model server is running and the model is installed." });
+    return;
+  }
+
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
-
   let fullResponse = "";
-
-  const stream = await openai.chat.completions.create({
-    model: "gpt-5.2",
-    max_completion_tokens: 8192,
-    messages: chatMessages,
-    stream: true,
-  });
+  try {
 
   for await (const chunk of stream) {
     const content = chunk.choices[0]?.delta?.content;
@@ -196,6 +208,11 @@ router.post("/conversations/:id/messages", async (req, res): Promise<void> => {
 
   res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
   res.end();
+  } catch (error) {
+    req.log.error({ err: error }, "AI stream failed");
+    res.write(`data: ${JSON.stringify({ error: "The AI response was interrupted. Please try again." })}\n\n`);
+    res.end();
+  }
 });
 
 export default router;
